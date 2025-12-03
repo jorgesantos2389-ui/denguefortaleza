@@ -178,4 +178,38 @@ if not df.empty and indicador and len(bairros_selecionados) > 0:
             ax.set_ylabel(indicador)
             ax.set_xlabel("Bairros")
             ax.set_title(f"{indicador} por Bairro - Fortaleza ({ano})")
-            ax.tick_params(axis='x', labelrotation
+            ax.tick_params(axis="x", labelrotation=90)
+            st.pyplot(fig)
+    else:
+        base_evo = df[df["BAIRRO"].astype(str).isin(bairros_selecionados)].copy()
+
+        # Caso especial: evolução de Incidência e Casos de dengue totais em dois gráficos
+        if indicador == "INCIDÊNCIA TOTAL" and "CASOS DE DENGUE TOTAIS" in base_evo.columns:
+            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10), sharex=True)
+            for bairro in bairros_selecionados:
+                dados_bairro = base_evo[base_evo["BAIRRO"].astype(str) == bairro].sort_values("ANO")
+                ax1.plot(dados_bairro["ANO"], dados_bairro["INCIDÊNCIA TOTAL"], marker="o", label=bairro)
+                ax2.plot(dados_bairro["ANO"], dados_bairro["CASOS DE DENGUE TOTAIS"], marker="o", label=bairro)
+            ax1.set_ylabel("Incidência total")
+            ax1.set_title("Evolução de Incidência total nos bairros selecionados")
+            ax1.legend(loc="upper left", bbox_to_anchor=(1, 1))
+
+            ax2.set_ylabel("Casos de dengue totais")
+            ax2.set_xlabel("Ano")
+            ax2.set_title("Evolução de Casos de dengue totais nos bairros selecionados")
+            ax2.legend(loc="upper left", bbox_to_anchor=(1, 1))
+
+            st.pyplot(fig)
+        else:
+            fig, ax = plt.subplots(figsize=(12, 6))
+            dados_plot = base_evo[["ANO", "BAIRRO", indicador]].dropna()
+            for bairro in bairros_selecionados:
+                dados_bairro = dados_plot[dados_plot["BAIRRO"].astype(str) == bairro].sort_values("ANO")
+                ax.plot(dados_bairro["ANO"], dados_bairro[indicador], marker="o", label=bairro)
+            ax.set_ylabel(indicador)
+            ax.set_xlabel("Ano")
+            ax.set_title(f"Evolução de {indicador} nos bairros selecionados")
+            ax.legend(loc="upper left", bbox_to_anchor=(1, 1))
+            st.pyplot(fig)
+else:
+    st.warning("Nenhum dado disponível para visualização. Selecione ao menos um bairro e um indicador.")
