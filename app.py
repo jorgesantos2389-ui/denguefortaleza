@@ -9,7 +9,6 @@ st.title("🦟 Casos de Dengue em Fortaleza - 2024")
 df_raw = pd.read_excel("Casos dengue - Fortaleza.xlsx", header=None)
 
 def encontrar_linha_cabecalho(df):
-    # Procura linha que contenha 'bairro'
     for i in range(len(df)):
         linha = df.iloc[i].astype(str).str.strip().str.upper()
         if any(cell == "BAIRRO" for cell in linha):
@@ -23,7 +22,6 @@ if idx_header is None:
 
 # 2) Criar nomes únicos de colunas a partir do cabeçalho encontrado
 header_row = df_raw.iloc[idx_header].astype(str).str.strip()
-
 colunas_unicas = header_row.tolist()
 
 # 3) Dados abaixo do cabeçalho
@@ -52,10 +50,11 @@ if "BAIRRO" not in df.columns:
 df = df.dropna(subset=["BAIRRO"])
 df = df[df["BAIRRO"].astype(str).str.upper() != "TOTAL"]
 
-# 6) Converter colunas numéricas
+# ✅ 6) Converter colunas numéricas com verificação segura
 cols_numericas = [col for col in df.columns if col != "BAIRRO"]
 for c in cols_numericas:
-    df[c] = pd.to_numeric(df[c], errors="coerce")
+    if c in df.columns and isinstance(df[c], pd.Series):
+        df[c] = pd.to_numeric(df[c], errors="coerce")
 
 # 7) Exibir tabela organizada
 st.subheader("Tabela organizada de casos por bairro")
