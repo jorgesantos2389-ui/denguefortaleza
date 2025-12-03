@@ -14,33 +14,24 @@ def encontrar_linha_bairro(df):
             return i
     return None
 
-# Parser robusto para números BR (evita 5934 em vez de 59,34)
+# Parser robusto para números BR
 def parse_num_br(valor):
     if pd.isna(valor):
         return pd.NA
     s = str(valor).strip()
-
-    # Remover símbolos comuns e manter apenas dígitos, . , -
     s = s.replace("%", "").replace("‰", "")
     s = re.sub(r"[^\d\.,\-]", "", s)
-
-    # Decidir separador decimal conforme último símbolo
     if "." in s and "," in s:
         last_dot = s.rfind(".")
         last_comma = s.rfind(",")
         if last_comma > last_dot:
-            # vírgula é decimal; ponto é milhar
             s = s.replace(".", "")
             s = s.replace(",", ".")
         else:
-            # ponto é decimal; vírgula é milhar
             s = s.replace(",", "")
     else:
-        # Apenas vírgula => decimal
         if "," in s:
             s = s.replace(",", ".")
-        # Apenas ponto => já decimal
-
     try:
         return float(s)
     except:
@@ -57,11 +48,9 @@ def carregar_ano(caminho, ano):
     df = df_raw.iloc[idx_header + 1:].copy()
     df.columns = header
 
-    # Limpar colunas e padronizar nomes
     df = df.loc[:, ~df.columns.astype(str).str.upper().str.startswith("UNNAMED")]
     df.columns = df.columns.astype(str).str.strip().str.upper()
 
-    # Mapear cabeçalhos (renomeando DENGUE TOTAL para CASOS DE DENGUE TOTAIS)
     mapeamento = {
         "BAIRRO": "BAIRRO",
         "POPULAÇÃO": "POPULAÇÃO",
@@ -78,22 +67,19 @@ def carregar_ano(caminho, ano):
         st.warning(f"A coluna 'BAIRRO' não foi encontrada no arquivo {caminho}")
         return pd.DataFrame()
 
-    # Remover linhas inválidas
     df = df.dropna(subset=["BAIRRO"])
     df = df[df["BAIRRO"].astype(str).str.upper() != "TOTAL"]
 
-    # Converter colunas numéricas
     for c in df.columns:
         if c != "BAIRRO":
             df[c] = df[c].apply(parse_num_br)
 
-    # Arredondar incidências para 2 casas decimais
     colunas_incidencia = ["INCIDÊNCIA TOTAL", "INCIDÊNCIA DE CASOS GRAVES", "TAXA DE LETALIDADE"]
     for c in colunas_incidencia:
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors="coerce").round(2)
 
-    df["ANO"] = int(ano)  # Garantir que ANO seja inteiro
+    df["ANO"] = int(ano)
     return df
 
 # Carregar os três anos
@@ -101,10 +87,10 @@ df_2022 = carregar_ano("Casos dengue - Fortaleza - 2022.xlsx", 2022)
 df_2023 = carregar_ano("Casos dengue - Fortaleza - 2023.xlsx", 2023)
 df_2024 = carregar_ano("Casos dengue - Fortaleza - 2024.xlsx", 2024)
 
-# Consolidar
+# Consolidar e garantir anos corretos
 df = pd.concat([df_2022, df_2023, df_2024], ignore_index=True)
-df["ANO"] = df["ANO"].astype(int)  # Remover decimais
-df = df[df["ANO"].isin([2022, 2023, 2024])]  # Mostrar apenas os anos desejados
+df["ANO"] = pd.to_numeric(df["ANO"], errors="coerce").astype("Int64").astype(int)
+df = df[df["ANO"].isin([2022, 2023, 2024])]
 
 # Seleção múltipla de bairros e ano
 bairros_selecionados = st.multiselect("Selecione o(s) bairro(s):", sorted(df["BAIRRO"].astype(str).unique()))
@@ -129,6 +115,9 @@ if mostrar_tabelas:
         for c in ["INCIDÊNCIA TOTAL", "INCIDÊNCIA DE CASOS GRAVES", "TAXA DE LETALIDADE"]:
             if c in df_exibir.columns:
                 df_exibir[c] = df_exibir[c].apply(formatar_br)
+        # Garantir ANO inteiro na exibição
+        if "ANO" in df_exibir.columns:
+            df_exibir["ANO"] = df_exibir["ANO"].astype(int)
         st.subheader(f"Dados para {', '.join(bairros_selecionados)} em {ano}")
         st.dataframe(df_exibir)
     else:
@@ -154,7 +143,6 @@ if not df.empty and indicador and len(bairros_selecionados) > 0:
         fig, ax = plt.subplots(figsize=(14, 6))
         base = df[(df["ANO"] == ano) & (df["BAIRRO"].astype(str).isin(bairros_selecionados))].copy()
 
-        # Caso especial: INCIDÊNCIA TOTAL + CASOS DE DENGUE TOTAIS lado a lado
         if indicador == "INCIDÊNCIA TOTAL" and "CASOS DE DENGUE TOTAIS" in base.columns:
             dados_plot = base[["BAIRRO", "INCIDÊNCIA TOTAL", "CASOS DE DENGUE TOTAIS"]].dropna()
             dados_plot = dados_plot.sort_values("INCIDÊNCIA TOTAL", ascending=False)
@@ -183,13 +171,17 @@ if not df.empty and indicador and len(bairros_selecionados) > 0:
     else:
         base_evo = df[df["BAIRRO"].astype(str).isin(bairros_selecionados)].copy()
 
-        # Caso especial: evolução de Incidência e Casos de dengue totais em dois gráficos
         if indicador == "INCIDÊNCIA TOTAL" and "CASOS DE DENGUE TOTAIS" in base_evo.columns:
             fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10), sharex=True)
             for bairro in bairros_selecionados:
                 dados_bairro = base_evo[base_evo["BAIRRO"].astype(str) == bairro].sort_values("ANO")
-                ax1.plot(dados_bairro["ANO"], dados_bairro["INCIDÊNCIA TOTAL"], marker="o", label=bairro)
-                ax2.plot(dados_bairro["ANO"], dados_bairro["CASOS DE DENGUE TOTAIS"], marker="o", label=bairro)
+                ax1.plot(dados_bairro["ANO"].astype(int), dados_bairro["INCIDÊNCIA TOTAL"], marker="o", label=bairro)
+                ax2.plot(dados_bairro["ANO"].astype(int), dados_bairro["CASOS DE DENGUE TOTAIS"], marker="o", label=bairro)
+
+            # Forçar ticks inteiros 2022, 2023, 2024
+            anos_ticks = [2022, 2023, 2024]
+            ax2.set_xticks(anos_ticks)
+
             ax1.set_ylabel("Incidência total")
             ax1.set_title("Evolução de Incidência total nos bairros selecionados")
             ax1.legend(loc="upper left", bbox_to_anchor=(1, 1))
@@ -205,7 +197,12 @@ if not df.empty and indicador and len(bairros_selecionados) > 0:
             dados_plot = base_evo[["ANO", "BAIRRO", indicador]].dropna()
             for bairro in bairros_selecionados:
                 dados_bairro = dados_plot[dados_plot["BAIRRO"].astype(str) == bairro].sort_values("ANO")
-                ax.plot(dados_bairro["ANO"], dados_bairro[indicador], marker="o", label=bairro)
+                ax.plot(dados_bairro["ANO"].astype(int), dados_bairro[indicador], marker="o", label=bairro)
+
+            # Forçar ticks inteiros 2022, 2023, 2024
+            anos_ticks = [2022, 2023, 2024]
+            ax.set_xticks(anos_ticks)
+
             ax.set_ylabel(indicador)
             ax.set_xlabel("Ano")
             ax.set_title(f"Evolução de {indicador} nos bairros selecionados")
