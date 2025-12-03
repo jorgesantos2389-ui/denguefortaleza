@@ -189,7 +189,6 @@ if not df.empty and indicador and len(bairros_selecionados) > 0:
             ax1.set_title("Evolução de Incidência total nos bairros selecionados")
             ax1.legend(loc="upper left", bbox_to_anchor=(1, 1))
 
-            st.pyplot(fig)
         else:
             fig, ax = plt.subplots(figsize=(12, 6))
             dados_plot = base_evo[["ANO", "BAIRRO", indicador]].dropna()
