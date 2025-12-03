@@ -189,6 +189,11 @@ if not df.empty and indicador and len(bairros_selecionados) > 0:
             ax1.set_title("Evolução de Incidência total nos bairros selecionados")
             ax1.legend(loc="upper left", bbox_to_anchor=(1, 1))
 
+            ax2.set_ylabel("Casos de dengue totais")
+            ax2.set_xlabel("Ano")
+            ax2.set_title("Evolução de Casos de dengue totais nos bairros selecionados")
+            ax2.legend(loc="upper left", bbox_to_anchor=(1, 1))
+
             st.pyplot(fig)
         else:
             fig, ax = plt.subplots(figsize=(12, 6))
@@ -200,6 +205,10 @@ if not df.empty and indicador and len(bairros_selecionados) > 0:
             anos_ticks = [2022, 2023, 2024]
             ax.set_xticks(anos_ticks)
 
+            ax.set_ylabel(indicador)
+            ax.set_xlabel("Ano")
+            ax.set_title(f"Evolução de {indicador} nos bairros selecionados")
+            ax.legend(loc="upper left", bbox_to_anchor=(1, 1))
             st.pyplot(fig)
 else:
     st.warning("Nenhum dado disponível para visualização. Selecione ao menos um bairro e um indicador.")
