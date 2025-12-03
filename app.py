@@ -40,4 +40,6 @@ def carregar_ano(caminho, ano):
 
     if "BAIRRO" not in df.columns:
         st.warning(f"A coluna 'BAIRRO' não foi encontrada no arquivo {caminho}")
-        return
+        return pd.DataFrame()
+
+    df = df.dropna(subset=["BAIRRO"])
