@@ -1,102 +1,149 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
 
 st.set_page_config(page_title="Casos de Dengue - Fortaleza", layout="wide")
 st.title("🦟 Casos de Dengue em Fortaleza - 2024")
 
-# 1) Ler sem cabeçalho
+# Ler sem cabeçalho
 df_raw = pd.read_excel("Casos dengue - Fortaleza.xlsx", header=None)
 
-def encontrar_linha_cabecalho(df):
-    # Procura linha que contenha 'bairro'
+# Encontrar linha com 'bairro' (cabeçalho principal)
+def encontrar_linha_bairro(df):
     for i in range(len(df)):
         linha = df.iloc[i].astype(str).str.strip().str.upper()
         if any(cell == "BAIRRO" for cell in linha):
             return i
     return None
 
-idx_header = encontrar_linha_cabecalho(df_raw)
-if idx_header is None:
-    st.error("Não foi possível identificar o cabeçalho com 'bairro' na planilha.")
+idx_main = encontrar_linha_bairro(df_raw)
+if idx_main is None:
+    st.error("Não foi possível identificar a linha com 'bairro' no cabeçalho.")
     st.stop()
 
-# 2) Cabeçalho e dados
-header_row = df_raw.iloc[idx_header].astype(str).str.strip()
-df = df_raw.iloc[idx_header + 1:].copy()
-df.columns = header_row.tolist()
+# A linha seguinte costuma ter as subcolunas (TOTAL, INCIDÊNCIA, LETALIDADE)
+idx_sub = idx_main + 1
+header_main = df_raw.iloc[idx_main].astype(str).str.strip()
+header_sub = df_raw.iloc[idx_sub].astype(str).str.strip()
 
-# Substituir colunas NaN por nomes de incidência (quando vierem como NaN, NaN.1 etc.)
-df.rename(columns={
-    "NaN": "DENGUE INCIDÊNCIA",
-    "NaN.1": "DENGUE SINAL DE ALERTA INCIDÊNCIA",
-    "NaN.2": "DENGUE GRAVE INCIDÊNCIA",
-    "NaN.3": "ÓBITO INCIDÊNCIA"
-}, inplace=True)
+# Construir nomes compostos
+col_names = []
+for g, s in zip(header_main, header_sub):
+    g_clean = str(g).strip().upper()
+    s_clean = str(s).strip().upper()
 
-# 3) Remover UNNAMED e padronizar para maiúsculas
-valid_cols = [c for c in df.columns if c is not None and not str(c).upper().startswith("UNNAMED")]
-df = df[valid_cols]
-df.columns = pd.Index([str(c).strip().upper() for c in df.columns])
+    # Ignorar colunas vazias/UNNAMED
+    if (g_clean == "" or g_clean.startswith("UNNAMED")) and (s_clean == "" or s_clean.startswith("UNNAMED")):
+        col_names.append(None)
+        continue
 
-# 4) Deduplicar nomes de colunas com sufixos .1, .2, ...
-def dedupe_columns(cols):
+    # Colunas simples
+    if g_clean in ["BAIRRO", "POPULAÇÃO"]:
+        col_names.append(g_clean)
+        continue
+
+    # Casos especiais para ÓBITO/LETALIDADE que vêm em dois níveis
+    if g_clean == "ÓBITO":
+        # Subcolunas devem ser TOTAL (contagem de óbitos) e LETALIDADE (%)
+        if s_clean == "TOTAL":
+            col_names.append("ÓBITO TOTAL")
+        elif s_clean == "LETALIDADE":
+            col_names.append("LETALIDADE")
+        else:
+            # fallback
+            col_names.append("ÓBITO TOTAL" if "TOTAL" in s_clean else "LETALIDADE" if "LETALIDADE" in s_clean else "ÓBITO TOTAL")
+        continue
+
+    # Grupos de dengue
+    grupos_validos = [
+        "DENGUE", "DENGUE SINAL DE ALERTA", "DENGUE GRAVE"
+    ]
+    if g_clean in grupos_validos:
+        if s_clean in ["TOTAL", "INCIDÊNCIA"]:
+            col_names.append(f"{g_clean} {s_clean}")
+        else:
+            # se subcoluna vier vazia, tenta inferir
+            col_names.append(f"{g_clean} TOTAL")
+        continue
+
+    # Se não casou, mantém o grupo
+    col_names.append(g_clean if g_clean else s_clean or None)
+
+# Pegar os dados abaixo das duas linhas de cabeçalho
+df = df_raw.iloc[idx_sub + 1:].copy()
+df.columns = col_names
+
+# Remover colunas None/UNNAMED e duplicadas
+df = df.loc[:, [c for c in df.columns if c is not None and not str(c).upper().startswith("UNNAMED")]]
+# Desduplicar nomes (se houver)
+def dedupe(cols):
     seen = {}
-    new = []
+    out = []
     for c in cols:
         k = str(c)
         if k in seen:
             seen[k] += 1
-            new.append(f"{k}.{seen[k]}")
+            out.append(f"{k}.{seen[k]}")
         else:
             seen[k] = 0
-            new.append(k)
-    return new
+            out.append(k)
+    return out
+df.columns = dedupe(df.columns)
 
-df.columns = dedupe_columns(df.columns)
+# Padronizar para maiúsculas
+df.columns = pd.Index([str(c).strip().upper() for c in df.columns])
 
-# 5) Mapear incidências duplicadas para nomes claros por grupo
-df.rename(columns={
+# Garantir colunas essenciais
+essenciais = ["BAIRRO", "POPULAÇÃO", "DENGUE TOTAL", "DENGUE INCIDÊNCIA",
+              "DENGUE SINAL DE ALERTA TOTAL", "DENGUE SINAL DE ALERTA INCIDÊNCIA",
+              "DENGUE GRAVE TOTAL", "DENGUE GRAVE INCIDÊNCIA",
+              "ÓBITO TOTAL", "LETALIDADE"]
+# Mapear possíveis variações (ex.: INCIDÊNCIA.1 -> DENGUE SINAL DE ALERTA INCIDÊNCIA)
+variacoes = {
     "INCIDÊNCIA": "DENGUE INCIDÊNCIA",
     "INCIDÊNCIA.1": "DENGUE SINAL DE ALERTA INCIDÊNCIA",
     "INCIDÊNCIA.2": "DENGUE GRAVE INCIDÊNCIA",
     "INCIDÊNCIA.3": "ÓBITO INCIDÊNCIA",
-    "ÓBITO": "ÓBITO TOTAL"  # se houver apenas 'ÓBITO' sem 'TOTAL'
-}, inplace=True)
+    "ÓBITO": "ÓBITO TOTAL"
+}
+df.rename(columns=variacoes, inplace=True)
 
-# 6) Garantir presença de BAIRRO e limpar linhas
+# Limpar linhas nulas e TOTAL
 if "BAIRRO" not in df.columns:
-    st.error("A coluna 'BAIRRO' não foi encontrada após limpeza. Verifique o cabeçalho.")
+    st.error("A coluna 'BAIRRO' não foi encontrada após limpeza.")
     st.write("Colunas detectadas:", list(df.columns))
     st.stop()
 
 df = df.dropna(subset=["BAIRRO"])
 df = df[df["BAIRRO"].astype(str).str.upper() != "TOTAL"]
 
-# 7) Converter colunas numéricas com verificação segura
-cols_numericas = [c for c in df.columns if c != "BAIRRO"]
-for c in cols_numericas:
-    if c in df.columns and isinstance(df[c], pd.Series):
-        df[c] = pd.to_numeric(df[c], errors="coerce")
+# Converter números (tratar vírgula como decimal)
+def to_num_safe(series):
+    return pd.to_numeric(series.astype(str).str.replace(".", "", regex=False).str.replace(",", ".", regex=False), errors="coerce")
 
-# 8) Exibir tabela organizada
+for c in df.columns:
+    if c != "BAIRRO":
+        if isinstance(df[c], pd.Series):
+            df[c] = to_num_safe(df[c])
+
 st.subheader("Tabela organizada de casos por bairro")
 st.dataframe(df)
 
-# 9) Filtro por bairro
+# Filtro por bairro
 bairro = st.selectbox("Selecione o bairro:", sorted(df["BAIRRO"].astype(str).unique()))
 df_bairro = df[df["BAIRRO"].astype(str) == bairro]
 st.subheader(f"Dados para o bairro: {bairro}")
 st.dataframe(df_bairro)
 
-# 10) Indicadores disponíveis (exclui BAIRRO)
-indicadores_disponiveis = [c for c in df.columns if c != "BAIRRO"]
+# Indicadores disponíveis (apenas numéricos)
+indicadores_disponiveis = [c for c in essenciais if c in df.columns and c != "BAIRRO"]
 indicador = st.selectbox("Selecione o indicador para visualizar:", indicadores_disponiveis)
 
-# 11) Tipo de gráfico
+# Tipo de gráfico
 tipo_grafico = st.radio("Escolha o tipo de gráfico:", ("Barras", "Pizza"))
 
-# 12) Gráficos
+# Gráficos
 if not df.empty and indicador:
     if tipo_grafico == "Barras":
         fig, ax = plt.subplots(figsize=(14, 6))
