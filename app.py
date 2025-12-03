@@ -1,13 +1,137 @@
+import streamlit as st
+import pandas as pd
+import matplotlib.pyplot as plt
+import re
+
+st.set_page_config(page_title="Casos de Dengue - Fortaleza", layout="wide")
+st.title("🦟 Casos de Dengue em Fortaleza - 2022 a 2024")
+
+def encontrar_linha_bairro(df):
+    for i in range(len(df)):
+        linha = df.iloc[i].astype(str).str.strip().str.upper()
+        if any(cell == "BAIRRO" for cell in linha):
+            return i
+    return None
+
+# Parser robusto para números BR (evita 5934 em vez de 59,34)
+def parse_num_br(valor):
+    if pd.isna(valor):
+        return pd.NA
+    s = str(valor).strip()
+
+    # Remover símbolos comuns e manter apenas dígitos, . , -
+    s = s.replace("%", "").replace("‰", "")
+    s = re.sub(r"[^\d\.,\-]", "", s)
+
+    # Decidir separador decimal conforme último símbolo
+    if "." in s and "," in s:
+        last_dot = s.rfind(".")
+        last_comma = s.rfind(",")
+        if last_comma > last_dot:
+            # vírgula é decimal; ponto é milhar
+            s = s.replace(".", "")
+            s = s.replace(",", ".")
+        else:
+            # ponto é decimal; vírgula é milhar
+            s = s.replace(",", "")
+    else:
+        # Apenas vírgula => decimal
+        if "," in s:
+            s = s.replace(",", ".")
+        # Apenas ponto => já decimal
+
+    try:
+        return float(s)
+    except:
+        return pd.NA
+
+def carregar_ano(caminho, ano):
+    df_raw = pd.read_excel(caminho, header=None)
+    idx_header = encontrar_linha_bairro(df_raw)
+    if idx_header is None:
+        st.warning(f"Não foi possível identificar o cabeçalho no arquivo {caminho}")
+        return pd.DataFrame()
+
+    header = df_raw.iloc[idx_header].astype(str).str.strip()
+    df = df_raw.iloc[idx_header + 1:].copy()
+    df.columns = header
+
+    # Limpar colunas e padronizar nomes
+    df = df.loc[:, ~df.columns.astype(str).str.upper().str.startswith("UNNAMED")]
+    df.columns = df.columns.astype(str).str.strip().str.upper()
+
+    # Mapear cabeçalhos
+    mapeamento = {
+        "BAIRRO": "BAIRRO",
+        "POPULAÇÃO": "POPULAÇÃO",
+        "DENGUE TOTAL": "DENGUE TOTAL",
+        "INCIDÊNCIA TOTAL": "INCIDÊNCIA TOTAL",
+        "CASOS GRAVES TOTAIS": "CASOS GRAVES TOTAIS",
+        "INCIDÊNCIA DE CASOS GRAVES": "INCIDÊNCIA DE CASOS GRAVES",
+        "TOTAL DE ÓBITOS": "TOTAL DE ÓBITOS",
+        "TAXA DE LETALIDADE": "TAXA DE LETALIDADE",
+    }
+    df.rename(columns=lambda c: mapeamento.get(c, c), inplace=True)
+
+    if "BAIRRO" not in df.columns:
+        st.warning(f"A coluna 'BAIRRO' não foi encontrada no arquivo {caminho}")
+        return pd.DataFrame()
+
+    # Remover linhas inválidas
+    df = df.dropna(subset=["BAIRRO"])
+    df = df[df["BAIRRO"].astype(str).str.upper() != "TOTAL"]
+
+    # Converter colunas numéricas
+    for c in df.columns:
+        if c != "BAIRRO":
+            df[c] = df[c].apply(parse_num_br)
+
+    # Arredondar incidências para 2 casas decimais
+    colunas_incidencia = ["INCIDÊNCIA TOTAL", "INCIDÊNCIA DE CASOS GRAVES", "TAXA DE LETALIDADE"]
+    for c in colunas_incidencia:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce").round(2)
+
+    df["ANO"] = ano
+    return df
+
+# Carregar os três anos
+df_2022 = carregar_ano("Casos dengue - Fortaleza - 2022.xlsx", 2022)
+df_2023 = carregar_ano("Casos dengue - Fortaleza - 2023.xlsx", 2023)
+df_2024 = carregar_ano("Casos dengue - Fortaleza - 2024.xlsx", 2024)
+
+# Consolidar
+df = pd.concat([df_2022, df_2023, df_2024], ignore_index=True)
+
+# Seleção múltipla de bairros e ano
+bairros_selecionados = st.multiselect("Selecione o(s) bairro(s):", sorted(df["BAIRRO"].astype(str).unique()))
+ano = st.selectbox("Selecione o ano:", sorted(df["ANO"].unique()))
+
+# Toggle para mostrar/ocultar tabelas
+mostrar_tabelas = st.checkbox("Mostrar tabelas", value=False)
+
+# Filtragem
+df_filtrado = df[(df["BAIRRO"].astype(str).isin(bairros_selecionados)) & (df["ANO"] == ano)]
+
+# Formatação BR para exibição (sem alterar dados originais)
+def formatar_br(x):
+    if pd.isna(x):
+        return ""
+    return f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+# Exibir tabela se marcado
+if mostrar_tabelas:
+    df_exibir = df_filtrado.copy()
+    if not df_exibir.empty:
         for c in ["INCIDÊNCIA TOTAL", "INCIDÊNCIA DE CASOS GRAVES", "TAXA DE LETALIDADE"]:
             if c in df_exibir.columns:
                 df_exibir[c] = df_exibir[c].apply(formatar_br)
-
         st.subheader(f"Dados para {', '.join(bairros_selecionados)} em {ano}")
         st.dataframe(df_exibir)
     else:
-        st.info("Tabela vazia: selecione bairros e ano com dados disponíveis.")
+        st.info("Tabela vazia: selecione bairros e um ano com dados disponíveis.")
 
-# Indicadores disponíveis
+# Indicadores e visualizações
 indicadores_disponiveis = [
     "DENGUE TOTAL",
     "INCIDÊNCIA TOTAL",
@@ -36,4 +160,12 @@ if not df.empty and indicador:
         fig, ax = plt.subplots(figsize=(10, 6))
         dados_plot = df[df["BAIRRO"].astype(str).isin(bairros_selecionados)][["ANO", "BAIRRO", indicador]].dropna()
         for bairro in bairros_selecionados:
-            dados_bairro = dados
+            dados_bairro = dados_plot[dados_plot["BAIRRO"] == bairro].sort_values("ANO")
+            ax.plot(dados_bairro["ANO"], dados_bairro[indicador], marker="o", label=bairro)
+        ax.set_ylabel(indicador)
+        ax.set_xlabel("Ano")
+        ax.set_title(f"Evolução de {indicador} nos bairros selecionados")
+        ax.legend()
+        st.pyplot(fig)
+else:
+    st.warning("Nenhum dado disponível para visualização.")
