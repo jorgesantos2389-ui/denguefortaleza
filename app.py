@@ -92,8 +92,12 @@ df = pd.concat([df_2022, df_2023, df_2024], ignore_index=True)
 df["ANO"] = pd.to_numeric(df["ANO"], errors="coerce").astype("Int64").astype(int)
 df = df[df["ANO"].isin([2022, 2023, 2024])]
 
-# Seleção múltipla de bairros e ano
-bairros_selecionados = st.multiselect("Selecione o(s) bairro(s):", sorted(df["BAIRRO"].astype(str).unique()))
+# Seleção múltipla de bairros e ano (limitado a 10 bairros)
+bairros_selecionados = st.multiselect(
+    "Selecione até 10 bairros:",
+    options=sorted(df["BAIRRO"].astype(str).unique()),
+    max_selections=10
+)
 ano = st.selectbox("Selecione o ano:", sorted(df["ANO"].unique()))
 
 # Toggle para mostrar/ocultar tabelas
@@ -178,7 +182,6 @@ if not df.empty and indicador and len(bairros_selecionados) > 0:
                 ax1.plot(dados_bairro["ANO"].astype(int), dados_bairro["INCIDÊNCIA TOTAL"], marker="o", label=bairro)
                 ax2.plot(dados_bairro["ANO"].astype(int), dados_bairro["CASOS DE DENGUE TOTAIS"], marker="o", label=bairro)
 
-            # Forçar ticks inteiros 2022, 2023, 2024
             anos_ticks = [2022, 2023, 2024]
             ax2.set_xticks(anos_ticks)
 
@@ -199,7 +202,6 @@ if not df.empty and indicador and len(bairros_selecionados) > 0:
                 dados_bairro = dados_plot[dados_plot["BAIRRO"].astype(str) == bairro].sort_values("ANO")
                 ax.plot(dados_bairro["ANO"].astype(int), dados_bairro[indicador], marker="o", label=bairro)
 
-            # Forçar ticks inteiros 2022, 2023, 2024
             anos_ticks = [2022, 2023, 2024]
             ax.set_xticks(anos_ticks)
 
