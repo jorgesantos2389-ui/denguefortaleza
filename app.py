@@ -94,7 +94,7 @@ df = df[df["ANO"].isin([2022, 2023, 2024])]
 
 # Seleção múltipla de bairros e ano (limitado a 10 bairros)
 bairros_selecionados = st.multiselect(
-    "Selecione até 10 bairros:",
+    "Selecione até 10 bairros de Fortaleza:",
     options=sorted(df["BAIRRO"].astype(str).unique()),
     max_selections=10
 )
@@ -155,7 +155,6 @@ if not df.empty and indicador and len(bairros_selecionados) > 0:
             width = 0.4
 
             ax.bar(x - width/2, dados_plot["INCIDÊNCIA TOTAL"], width=width, label="Incidência", color="orange")
-            ax.bar(x + width/2, dados_plot["CASOS DE DENGUE TOTAIS"], width=width, label="Casos de dengue totais", color="steelblue")
 
             ax.set_xticks(x)
             ax.set_xticklabels(x_labels, rotation=90)
