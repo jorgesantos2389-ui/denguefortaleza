@@ -189,11 +189,6 @@ if not df.empty and indicador and len(bairros_selecionados) > 0:
             ax1.set_title("Evolução de Incidência total nos bairros selecionados")
             ax1.legend(loc="upper left", bbox_to_anchor=(1, 1))
 
-            ax2.set_ylabel("Casos de dengue totais")
-            ax2.set_xlabel("Ano")
-            ax2.set_title("Evolução de Casos de dengue totais nos bairros selecionados")
-            ax2.legend(loc="upper left", bbox_to_anchor=(1, 1))
-
             st.pyplot(fig)
         else:
             fig, ax = plt.subplots(figsize=(12, 6))
