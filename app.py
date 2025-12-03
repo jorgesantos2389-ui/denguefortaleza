@@ -11,13 +11,16 @@ st.title("🦟 Casos de Dengue em Fortaleza - 2024")
 # Carregar o arquivo Excel
 df = pd.read_excel("Casos dengue - Fortaleza.xlsx")
 
+# Padronizar nomes das colunas
+df.columns = df.columns.str.strip().str.upper()
+
 # Exibir os dados completos
 st.subheader("Tabela completa de casos por bairro")
 st.dataframe(df)
 
 # Filtro por bairro
-bairro = st.selectbox("Selecione o bairro:", df["bairro"].unique())
-df_bairro = df[df["bairro"] == bairro]
+bairro = st.selectbox("Selecione o bairro:", df["BAIRRO"].unique())
+df_bairro = df[df["BAIRRO"] == bairro]
 
 # Exibir dados filtrados
 st.subheader(f"Dados para o bairro: {bairro}")
@@ -39,7 +42,7 @@ tipo_grafico = st.radio(
 if not df.empty:
     if tipo_grafico == "Barras":
         fig, ax = plt.subplots(figsize=(12, 6))
-        ax.bar(df["bairro"], df[indicador], color="orange")
+        ax.bar(df["BAIRRO"], df[indicador], color="orange")
         ax.set_ylabel(indicador)
         ax.set_xlabel("Bairros")
         ax.set_title(f"{indicador} por Bairro - Fortaleza")
@@ -54,7 +57,7 @@ if not df.empty:
         )
         ax.legend(
             wedges,
-            df["bairro"],
+            df["BAIRRO"],
             title="Bairros",
             loc="center left",
             bbox_to_anchor=(1, 0, 0.5, 1)
