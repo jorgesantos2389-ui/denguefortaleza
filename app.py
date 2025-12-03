@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import re
 
 st.set_page_config(page_title="Casos de Dengue - Fortaleza", layout="wide")
 st.title("🦟 Casos de Dengue em Fortaleza - 2022 a 2024")
@@ -11,6 +12,41 @@ def encontrar_linha_bairro(df):
         if any(cell == "BAIRRO" for cell in linha):
             return i
     return None
+
+# Parser robusto para números em formato BR (evita 5934 em vez de 59,34)
+def parse_num_br(valor):
+    if pd.isna(valor):
+        return pd.NA
+    s = str(valor).strip()
+
+    # Remover símbolos comuns
+    s = s.replace("%", "").replace("‰", "")
+    # Remover espaços e caracteres não-numéricos exceto . , -
+    s = re.sub(r"[^\d\.,\-]", "", s)
+
+    # Se tiver ambos . e , decidir o decimal pelo último símbolo que aparece
+    if "." in s and "," in s:
+        last_dot = s.rfind(".")
+        last_comma = s.rfind(",")
+        # O último símbolo é considerado decimal, o outro é milhar
+        if last_comma > last_dot:
+            # , é decimal; . é milhar
+            s = s.replace(".", "")
+            s = s.replace(",", ".")
+        else:
+            # . é decimal; , é milhar
+            s = s.replace(",", "")
+            # s já tem . como decimal
+    else:
+        # Apenas vírgula: tratar como decimal
+        if "," in s:
+            s = s.replace(",", ".")
+        # Apenas ponto: manter como decimal (nenhuma remoção)
+
+    try:
+        return float(s)
+    except:
+        return pd.NA
 
 def carregar_ano(caminho, ano):
     df_raw = pd.read_excel(caminho, header=None)
@@ -45,17 +81,13 @@ def carregar_ano(caminho, ano):
     df = df.dropna(subset=["BAIRRO"])
     df = df[df["BAIRRO"].astype(str).str.upper() != "TOTAL"]
 
-    # Conversão BR com arredondamento para 2 casas decimais
-    def to_num_br(series):
-        s = series.astype(str).str.replace(".", "", regex=False).str.replace(",", ".", regex=False)
-        return pd.to_numeric(s, errors="coerce").round(2)
-
+    # Converter colunas numéricas com parser robusto
     for c in df.columns:
         if c != "BAIRRO":
-            df[c] = to_num_br(df[c])
+            df[c] = df[c].apply(parse_num_br)
 
-    # Garantir incidências com 2 casas decimais (removendo zeros à esquerda via conversão numérica)
-    colunas_incidencia = ["INCIDÊNCIA TOTAL", "INCIDÊNCIA DE CASOS GRAVES"]
+    # Arredondar incidências para 2 casas decimais
+    colunas_incidencia = ["INCIDÊNCIA TOTAL", "INCIDÊNCIA DE CASOS GRAVES", "TAXA DE LETALIDADE"]
     for c in colunas_incidencia:
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors="coerce").round(2)
@@ -79,48 +111,13 @@ mostrar_tabelas = st.checkbox("Mostrar tabelas", value=False)
 
 df_filtrado = df[(df["BAIRRO"].astype(str).isin(bairros_selecionados)) & (df["ANO"] == ano)]
 
+# Formatação BR para exibição (sem alterar os dados originais)
+def formatar_br(x):
+    if pd.isna(x):
+        return ""
+    return f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
 if mostrar_tabelas:
     if not df_filtrado.empty:
-        st.subheader(f"Dados para {', '.join(bairros_selecionados)} em {ano}")
-        st.dataframe(df_filtrado)
-    else:
-        st.warning("Nenhum dado disponível para os bairros e ano selecionados.")
-
-# Indicadores disponíveis
-indicadores_disponiveis = [
-    "DENGUE TOTAL",
-    "INCIDÊNCIA TOTAL",
-    "CASOS GRAVES TOTAIS",
-    "INCIDÊNCIA DE CASOS GRAVES",
-    "TOTAL DE ÓBITOS",
-    "TAXA DE LETALIDADE",
-]
-indicadores_disponiveis = [c for c in indicadores_disponiveis if c in df.columns]
-
-indicador = st.selectbox("Selecione o indicador para visualizar:", indicadores_disponiveis)
-tipo_grafico = st.radio("Escolha o tipo de gráfico:", ("Barras", "Evolução por ano"))
-
-# Gráficos
-if not df.empty and indicador:
-    if tipo_grafico == "Barras":
-        fig, ax = plt.subplots(figsize=(14, 6))
-        dados_plot = df[(df["ANO"] == ano) & (df["BAIRRO"].astype(str).isin(bairros_selecionados))][["BAIRRO", indicador]].dropna().sort_values(indicador, ascending=False)
-        ax.bar(dados_plot["BAIRRO"], dados_plot[indicador], color="orange")
-        ax.set_ylabel(indicador)
-        ax.set_xlabel("Bairros")
-        ax.set_title(f"{indicador} por Bairro - Fortaleza ({ano})")
-        ax.tick_params(axis='x', labelrotation=90)
-        st.pyplot(fig)
-    else:
-        fig, ax = plt.subplots(figsize=(10, 6))
-        dados_plot = df[df["BAIRRO"].astype(str).isin(bairros_selecionados)][["ANO", "BAIRRO", indicador]].dropna()
-        for bairro in bairros_selecionados:
-            dados_bairro = dados_plot[dados_plot["BAIRRO"] == bairro].sort_values("ANO")
-            ax.plot(dados_bairro["ANO"], dados_bairro[indicador], marker="o", label=bairro)
-        ax.set_ylabel(indicador)
-        ax.set_xlabel("Ano")
-        ax.set_title(f"Evolução de {indicador} nos bairros selecionados")
-        ax.legend()
-        st.pyplot(fig)
-else:
-    st.warning("Nenhum dado disponível para visualização.")
+        df_exibir = df_filtrado.copy()
+       
