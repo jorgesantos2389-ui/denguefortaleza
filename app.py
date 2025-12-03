@@ -15,6 +15,7 @@ def encontrar_linha_bairro(df):
             return i
     return None
 
+# Parser robusto para números BR
 def parse_num_br(valor):
     if pd.isna(valor):
         return pd.NA
@@ -48,9 +49,11 @@ def carregar_ano(caminho, ano):
     df = df_raw.iloc[idx_header + 1:].copy()
     df.columns = header
 
+    # Limpar colunas e padronizar nomes
     df = df.loc[:, ~df.columns.astype(str).str.upper().str.startswith("UNNAMED")]
     df.columns = df.columns.astype(str).str.strip().str.upper()
 
+    # Mapear cabeçalhos
     mapeamento = {
         "BAIRRO": "BAIRRO",
         "POPULAÇÃO": "POPULAÇÃO",
@@ -67,13 +70,16 @@ def carregar_ano(caminho, ano):
         st.warning(f"A coluna 'BAIRRO' não foi encontrada no arquivo {caminho}")
         return pd.DataFrame()
 
+    # Remover linhas inválidas e TOTAL
     df = df.dropna(subset=["BAIRRO"])
     df = df[df["BAIRRO"].astype(str).str.upper() != "TOTAL"]
 
+    # Converter colunas numéricas
     for c in df.columns:
         if c != "BAIRRO":
             df[c] = df[c].apply(parse_num_br)
 
+    # Arredondar incidências para 2 casas
     colunas_incidencia = ["INCIDÊNCIA TOTAL", "INCIDÊNCIA DE CASOS GRAVES", "TAXA DE LETALIDADE"]
     for c in colunas_incidencia:
         if c in df.columns:
@@ -106,7 +112,8 @@ mostrar_tabelas = st.checkbox("Mostrar tabelas", value=False)
 # Filtragem
 df_filtrado = df[(df["BAIRRO"].astype(str).isin(bairros_selecionados)) & (df["ANO"] == ano)]
 
-def formatar_br(x):
+# Formatação BR para exibição (sem alterar dados originais)
+def formatar_br_valor(x):
     if pd.isna(x):
         return ""
     return f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
@@ -117,7 +124,7 @@ if mostrar_tabelas:
     if not df_exibir.empty:
         for c in ["INCIDÊNCIA TOTAL", "INCIDÊNCIA DE CASOS GRAVES", "TAXA DE LETALIDADE"]:
             if c in df_exibir.columns:
-                df_exibir[c] = df_exibir[c].apply(formatar_br)
+                df_exibir[c] = df_exibir[c].apply(formatar_br_valor)
         if "ANO" in df_exibir.columns:
             df_exibir["ANO"] = df_exibir["ANO"].astype(int)
         st.subheader(f"Dados para {', '.join(bairros_selecionados)} em {ano}")
@@ -139,9 +146,17 @@ indicadores_disponiveis = [c for c in indicadores_disponiveis if c in df.columns
 indicador = st.selectbox("Selecione o indicador para visualizar:", indicadores_disponiveis)
 tipo_grafico = st.radio("Escolha o tipo de gráfico:", ("Barras", "Evolução por ano"))
 
-# Formatação do eixo Y com decimais brasileiros
-def formatar_eixo_br(x, pos):
+# Formatter do eixo Y somente para os gráficos de incidência
+def yformatter_br(x, pos):
     return f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+def aplicar_formato_eixo_y(ax, indicador):
+    if indicador in ["INCIDÊNCIA TOTAL", "INCIDÊNCIA DE CASOS GRAVES"]:
+        ax.yaxis.set_major_formatter(mticker.FuncFormatter(yformatter_br))
+    else:
+        # Remover qualquer formatter anterior (mostra sem decimais padrão do Matplotlib)
+        ax.yaxis.set_major_formatter(mticker.ScalarFormatter())
+        ax.yaxis.set_major_locator(mticker.MaxNLocator(integer=True))
 
 # Gráficos
 if not df.empty and indicador and len(bairros_selecionados) > 0:
@@ -154,7 +169,7 @@ if not df.empty and indicador and len(bairros_selecionados) > 0:
         ax.set_xlabel("Bairros")
         ax.set_title(f"{indicador} por Bairro - Fortaleza ({ano})")
         ax.tick_params(axis="x", labelrotation=90)
-        ax.yaxis.set_major_formatter(mticker.FuncFormatter(formatar_eixo_br))
+        aplicar_formato_eixo_y(ax, indicador)
         st.pyplot(fig)
     else:
         base_evo = df[df["BAIRRO"].astype(str).isin(bairros_selecionados)].copy()
@@ -167,8 +182,9 @@ if not df.empty and indicador and len(bairros_selecionados) > 0:
         ax.set_ylabel(indicador)
         ax.set_xlabel("Ano")
         ax.set_title(f"Evolução de {indicador} nos bairros selecionados")
-        ax.yaxis.set_major_formatter(mticker.FuncFormatter(formatar_eixo_br))
+        aplicar_formato_eixo_y(ax, indicador)
         ax.legend(loc="upper left", bbox_to_anchor=(1, 1))
         st.pyplot(fig)
 else:
     st.warning("Nenhum dado disponível para visualização. Selecione ao menos um bairro e um indicador.")
+    
