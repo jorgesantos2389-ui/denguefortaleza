@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
 import re
 import numpy as np
 
@@ -138,6 +139,10 @@ indicadores_disponiveis = [c for c in indicadores_disponiveis if c in df.columns
 indicador = st.selectbox("Selecione o indicador para visualizar:", indicadores_disponiveis)
 tipo_grafico = st.radio("Escolha o tipo de gráfico:", ("Barras", "Evolução por ano"))
 
+# Formatação do eixo Y com decimais brasileiros
+def formatar_eixo_br(x, pos):
+    return f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
 # Gráficos
 if not df.empty and indicador and len(bairros_selecionados) > 0:
     if tipo_grafico == "Barras":
@@ -149,6 +154,7 @@ if not df.empty and indicador and len(bairros_selecionados) > 0:
         ax.set_xlabel("Bairros")
         ax.set_title(f"{indicador} por Bairro - Fortaleza ({ano})")
         ax.tick_params(axis="x", labelrotation=90)
+        ax.yaxis.set_major_formatter(mticker.FuncFormatter(formatar_eixo_br))
         st.pyplot(fig)
     else:
         base_evo = df[df["BAIRRO"].astype(str).isin(bairros_selecionados)].copy()
@@ -161,6 +167,7 @@ if not df.empty and indicador and len(bairros_selecionados) > 0:
         ax.set_ylabel(indicador)
         ax.set_xlabel("Ano")
         ax.set_title(f"Evolução de {indicador} nos bairros selecionados")
+        ax.yaxis.set_major_formatter(mticker.FuncFormatter(formatar_eixo_br))
         ax.legend(loc="upper left", bbox_to_anchor=(1, 1))
         st.pyplot(fig)
 else:
