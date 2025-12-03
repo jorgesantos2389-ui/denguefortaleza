@@ -45,13 +45,20 @@ def carregar_ano(caminho, ano):
     df = df.dropna(subset=["BAIRRO"])
     df = df[df["BAIRRO"].astype(str).str.upper() != "TOTAL"]
 
+    # Conversão BR com arredondamento para 2 casas decimais
     def to_num_br(series):
         s = series.astype(str).str.replace(".", "", regex=False).str.replace(",", ".", regex=False)
-        return pd.to_numeric(s, errors="coerce")
+        return pd.to_numeric(s, errors="coerce").round(2)
 
     for c in df.columns:
         if c != "BAIRRO":
             df[c] = to_num_br(df[c])
+
+    # Garantir incidências com 2 casas decimais (removendo zeros à esquerda via conversão numérica)
+    colunas_incidencia = ["INCIDÊNCIA TOTAL", "INCIDÊNCIA DE CASOS GRAVES"]
+    for c in colunas_incidencia:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce").round(2)
 
     df["ANO"] = ano
     return df
@@ -63,7 +70,7 @@ df_2024 = carregar_ano("Casos dengue - Fortaleza - 2024.xlsx", 2024)
 
 df = pd.concat([df_2022, df_2023, df_2024], ignore_index=True)
 
-# Filtro por múltiplos bairros e ano
+# Seleção múltipla de bairros e ano
 bairros_selecionados = st.multiselect("Selecione o(s) bairro(s):", sorted(df["BAIRRO"].astype(str).unique()))
 ano = st.selectbox("Selecione o ano:", sorted(df["ANO"].unique()))
 
