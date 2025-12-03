@@ -1,6 +1,9 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import folium
+from streamlit_folium import folium_static
+import geopandas as gpd
 
 st.set_page_config(page_title="Casos de Dengue - Fortaleza", layout="wide")
 st.title("🦟 Casos de Dengue em Fortaleza - 2024")
@@ -29,7 +32,7 @@ df.columns = header
 df = df.loc[:, ~df.columns.astype(str).str.upper().str.startswith("UNNAMED")]
 df.columns = df.columns.astype(str).str.strip().str.upper()
 
-# Mapear cabeçalhos para o padrão desejado (segundo sua imagem)
+# Mapear cabeçalhos para o padrão desejado
 mapeamento = {
     "BAIRRO": "BAIRRO",
     "POPULAÇÃO": "POPULAÇÃO",
@@ -48,11 +51,11 @@ if "BAIRRO" not in df.columns:
     st.write("Colunas detectadas:", list(df.columns))
     st.stop()
 
-# Remover linhas sem bairro e linha 'TOTAL' se existir
+# Remover linhas sem bairro e linha 'TOTAL'
 df = df.dropna(subset=["BAIRRO"])
 df = df[df["BAIRRO"].astype(str).str.upper() != "TOTAL"]
 
-# Converter números tratando vírgula como decimal (BR)
+# Converter números tratando vírgula como decimal
 def to_num_br(series):
     s = series.astype(str).str.replace(".", "", regex=False).str.replace(",", ".", regex=False)
     return pd.to_numeric(s, errors="coerce")
@@ -70,7 +73,7 @@ df_bairro = df[df["BAIRRO"].astype(str) == bairro]
 st.subheader(f"Dados para o bairro: {bairro}")
 st.dataframe(df_bairro)
 
-# Indicadores conforme os nomes da tabela fornecida
+# Indicadores disponíveis
 indicadores_disponiveis = [
     "DENGUE TOTAL",
     "INCIDÊNCIA TOTAL",
@@ -82,9 +85,9 @@ indicadores_disponiveis = [
 indicadores_disponiveis = [c for c in indicadores_disponiveis if c in df.columns]
 
 indicador = st.selectbox("Selecione o indicador para visualizar:", indicadores_disponiveis)
-tipo_grafico = st.radio("Escolha o tipo de gráfico:", ("Barras", "Pizza"))
+tipo_grafico = st.radio("Escolha a visualização:", ("Barras", "Mapa"))
 
-# Gráficos
+# Visualizações
 if not df.empty and indicador:
     if tipo_grafico == "Barras":
         fig, ax = plt.subplots(figsize=(14, 6))
@@ -96,17 +99,26 @@ if not df.empty and indicador:
         ax.tick_params(axis='x', labelrotation=90)
         st.pyplot(fig)
     else:
-        fig, ax = plt.subplots(figsize=(10, 8))
-        dados_plot = df[["BAIRRO", indicador]].dropna()
-        wedges, _ = ax.pie(dados_plot[indicador], startangle=90)
-        ax.legend(
-            wedges,
-            dados_plot["BAIRRO"],
-            title="Bairros",
-            loc="center left",
-            bbox_to_anchor=(1, 0, 0.5, 1)
-        )
-        ax.set_title(f"Distribuição de {indicador} por Bairro - Fortaleza")
-        st.pyplot(fig)
+        # Carregar shapefile dos bairros de Fortaleza
+        gdf = gpd.read_file("fortaleza_bairros.shp")
+        gdf["BAIRRO"] = gdf["BAIRRO"].str.upper().str.strip()
+        df["BAIRRO"] = df["BAIRRO"].str.upper().str.strip()
+        gdf = gdf.merge(df[["BAIRRO", indicador]], on="BAIRRO", how="left")
+
+        # Criar mapa
+        m = folium.Map(location=[-3.732, -38.526], zoom_start=11)
+        folium.Choropleth(
+            geo_data=gdf,
+            data=gdf,
+            columns=["BAIRRO", indicador],
+            key_on="feature.properties.BAIRRO",
+            fill_color="YlOrRd",
+            fill_opacity=0.7,
+            line_opacity=0.2,
+            legend_name=f"{indicador} por bairro"
+        ).add_to(m)
+
+        st.subheader(f"Mapa de Fortaleza - {indicador}")
+        folium_static(m)
 else:
-    st.warning("Nenhum dado disponível para plotagem.")
+    st.warning("Nenhum dado disponível para visualização.")
