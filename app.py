@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import re
+import numpy as np
 
 st.set_page_config(page_title="Casos de Dengue - Fortaleza", layout="wide")
 st.title("🦟 Casos de Dengue em Fortaleza - 2022 a 2024")
@@ -146,26 +147,68 @@ indicador = st.selectbox("Selecione o indicador para visualizar:", indicadores_d
 tipo_grafico = st.radio("Escolha o tipo de gráfico:", ("Barras", "Evolução por ano"))
 
 # Gráficos
-if not df.empty and indicador:
+if not df.empty and indicador and len(bairros_selecionados) > 0:
     if tipo_grafico == "Barras":
         fig, ax = plt.subplots(figsize=(14, 6))
-        dados_plot = df[(df["ANO"] == ano) & (df["BAIRRO"].astype(str).isin(bairros_selecionados))][["BAIRRO", indicador]].dropna().sort_values(indicador, ascending=False)
-        ax.bar(dados_plot["BAIRRO"], dados_plot[indicador], color="orange")
-        ax.set_ylabel(indicador)
-        ax.set_xlabel("Bairros")
-        ax.set_title(f"{indicador} por Bairro - Fortaleza ({ano})")
-        ax.tick_params(axis='x', labelrotation=90)
-        st.pyplot(fig)
+        base = df[(df["ANO"] == ano) & (df["BAIRRO"].astype(str).isin(bairros_selecionados))].copy()
+
+        # Caso especial: INCIDÊNCIA TOTAL + DENGUE TOTAL lado a lado
+        if indicador == "INCIDÊNCIA TOTAL" and "DENGUE TOTAL" in base.columns:
+            dados_plot = base[["BAIRRO", "INCIDÊNCIA TOTAL", "DENGUE TOTAL"]].dropna()
+            # Ordena por incidência
+            dados_plot = dados_plot.sort_values("INCIDÊNCIA TOTAL", ascending=False)
+            x_labels = dados_plot["BAIRRO"].astype(str).tolist()
+            x = np.arange(len(x_labels))
+            width = 0.4
+
+            ax.bar(x - width/2, dados_plot["INCIDÊNCIA TOTAL"], width=width, label="Incidência", color="orange")
+            ax.bar(x + width/2, dados_plot["DENGUE TOTAL"], width=width, label="Casos Totais", color="steelblue")
+
+            ax.set_xticks(x)
+            ax.set_xticklabels(x_labels, rotation=90)
+            ax.set_ylabel("Valor")
+            ax.set_xlabel("Bairros")
+            ax.set_title(f"Incidência e Casos Totais por Bairro - Fortaleza ({ano})")
+            ax.legend()
+            st.pyplot(fig)
+        else:
+            dados_plot = base[["BAIRRO", indicador]].dropna().sort_values(indicador, ascending=False)
+            ax.bar(dados_plot["BAIRRO"], dados_plot[indicador], color="orange")
+            ax.set_ylabel(indicador)
+            ax.set_xlabel("Bairros")
+            ax.set_title(f"{indicador} por Bairro - Fortaleza ({ano})")
+            ax.tick_params(axis='x', labelrotation=90)
+            st.pyplot(fig)
     else:
-        fig, ax = plt.subplots(figsize=(10, 6))
-        dados_plot = df[df["BAIRRO"].astype(str).isin(bairros_selecionados)][["ANO", "BAIRRO", indicador]].dropna()
-        for bairro in bairros_selecionados:
-            dados_bairro = dados_plot[dados_plot["BAIRRO"] == bairro].sort_values("ANO")
-            ax.plot(dados_bairro["ANO"], dados_bairro[indicador], marker="o", label=bairro)
-        ax.set_ylabel(indicador)
-        ax.set_xlabel("Ano")
-        ax.set_title(f"Evolução de {indicador} nos bairros selecionados")
-        ax.legend()
-        st.pyplot(fig)
+        base_evo = df[df["BAIRRO"].astype(str).isin(bairros_selecionados)].copy()
+
+        # Caso especial: mostrar evolução de Incidência e Casos Totais em dois gráficos
+        if indicador == "INCIDÊNCIA TOTAL" and "DENGUE TOTAL" in base_evo.columns:
+            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10), sharex=True)
+            for bairro in bairros_selecionados:
+                dados_bairro = base_evo[base_evo["BAIRRO"].astype(str) == bairro].sort_values("ANO")
+                ax1.plot(dados_bairro["ANO"], dados_bairro["INCIDÊNCIA TOTAL"], marker="o", label=bairro)
+                ax2.plot(dados_bairro["ANO"], dados_bairro["DENGUE TOTAL"], marker="o", label=bairro)
+            ax1.set_ylabel("Incidência total")
+            ax1.set_title("Evolução de Incidência total nos bairros selecionados")
+            ax1.legend(loc="upper left", bbox_to_anchor=(1, 1))
+
+            ax2.set_ylabel("Casos totais de dengue")
+            ax2.set_xlabel("Ano")
+            ax2.set_title("Evolução de Casos totais nos bairros selecionados")
+            ax2.legend(loc="upper left", bbox_to_anchor=(1, 1))
+
+            st.pyplot(fig)
+        else:
+            fig, ax = plt.subplots(figsize=(12, 6))
+            dados_plot = base_evo[["ANO", "BAIRRO", indicador]].dropna()
+            for bairro in bairros_selecionados:
+                dados_bairro = dados_plot[dados_plot["BAIRRO"].astype(str) == bairro].sort_values("ANO")
+                ax.plot(dados_bairro["ANO"], dados_bairro[indicador], marker="o", label=bairro)
+            ax.set_ylabel(indicador)
+            ax.set_xlabel("Ano")
+            ax.set_title(f"Evolução de {indicador} nos bairros selecionados")
+            ax.legend(loc="upper left", bbox_to_anchor=(1, 1))
+            st.pyplot(fig)
 else:
-    st.warning("Nenhum dado disponível para visualização.")
+    st.warning("Nenhum dado disponível para visualização. Selecione ao menos um bairro e um indicador.")
