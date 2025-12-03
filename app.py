@@ -155,6 +155,7 @@ if not df.empty and indicador and len(bairros_selecionados) > 0:
             width = 0.4
 
             ax.bar(x - width/2, dados_plot["INCIDÊNCIA TOTAL"], width=width, label="Incidência", color="orange")
+            ax.bar(x + width/2, dados_plot["CASOS DE DENGUE TOTAIS"], width=width, label="Casos de dengue totais", color="steelblue")
 
             ax.set_xticks(x)
             ax.set_xticklabels(x_labels, rotation=90)
@@ -179,7 +180,7 @@ if not df.empty and indicador and len(bairros_selecionados) > 0:
             for bairro in bairros_selecionados:
                 dados_bairro = base_evo[base_evo["BAIRRO"].astype(str) == bairro].sort_values("ANO")
                 ax1.plot(dados_bairro["ANO"].astype(int), dados_bairro["INCIDÊNCIA TOTAL"], marker="o", label=bairro)
-                ax2.plot(dados_bairro["ANO"].astype(int), dados_bairro["CASOS DE DENGUE TOTAIS"], marker="o", label=bairro)
+                
 
             anos_ticks = [2022, 2023, 2024]
             ax2.set_xticks(anos_ticks)
