@@ -210,21 +210,6 @@ if not df.empty and indicador and len(bairros_selecionados) > 0:
             st.markdown("**Variação total entre 2022 e 2024:**")
             for texto in variacoes_totais:
                 st.write(texto)
-
-
-        ax.set_xticks([2022, 2023, 2024])
-        ax.set_ylabel(indicador)
-        ax.set_xlabel("Ano")
-        ax.set_title(f"Evolução de {indicador} nos bairros selecionados")
-        aplicar_formato_eixo_y(ax, indicador)
-        ax.legend(loc="upper left", bbox_to_anchor=(1, 1))
-        st.pyplot(fig)
-
-        # mostrar variação percentual total abaixo do gráfico
-        if variacoes_totais:
-            st.markdown("**Variação total entre 2022 e 2024:**")
-            for texto in variacoes_totais:
-                st.write(texto)
 else:
     st.warning("Nenhum dado disponível para visualização. Selecione ao menos um bairro e um indicador.")
 
