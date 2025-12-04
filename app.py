@@ -186,14 +186,31 @@ if not df.empty and indicador and len(bairros_selecionados) > 0:
 
             # calcular variação total entre 2022 e 2024
             valores = dados_bairro[indicador].values
-            if len(valores) == 3:
-            # calcular variação total entre 2022 e 2024
+           # calcular variação total entre 2022 e 2024
             valores = dados_bairro[indicador].values
-            if len(valores) == 3:  # temos os três anos
-                perc_total = ((valores[2] - valores[0]) / valores[0] * 100) if valores[0] != 0 else 0
-                variacoes_totais.append(
-                    f"{bairro}: Variação total 2022→2024 = {perc_total:.2f}%"
-                )
+            if len(valores) == 3:
+                valor_2022 = valores[0]
+                valor_2024 = valores[2]
+                if valor_2022 != 0:
+                    variacao = ((valor_2024 - valor_2022) / valor_2022) * 100
+                    variacoes_totais.append(f"{bairro}: Variação total 2022→2024 = {variacao:.2f}%")
+                else:
+                    variacoes_totais.append(f"{bairro}: Variação total 2022→2024 = não calculável (valor inicial zero)")
+
+        ax.set_xticks([2022, 2023, 2024])
+        ax.set_ylabel(indicador)
+        ax.set_xlabel("Ano")
+        ax.set_title(f"Evolução de {indicador} nos bairros selecionados")
+        aplicar_formato_eixo_y(ax, indicador)
+        ax.legend(loc="upper left", bbox_to_anchor=(1, 1))
+        st.pyplot(fig)
+
+        # mostrar variação percentual total abaixo do gráfico
+        if variacoes_totais:
+            st.markdown("**Variação total entre 2022 e 2024:**")
+            for texto in variacoes_totais:
+                st.write(texto)
+
 
         ax.set_xticks([2022, 2023, 2024])
         ax.set_ylabel(indicador)
