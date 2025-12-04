@@ -186,7 +186,7 @@ if not df.empty and indicador and len(bairros_selecionados) > 0:
 
             # calcular variação total entre 2022 e 2024
             valores = dados_bairro[indicador].values
-            if len(valores):
+            if len(valores) == 3:
             # calcular variação total entre 2022 e 2024
             valores = dados_bairro[indicador].values
             if len(valores) == 3:  # temos os três anos
