@@ -1,5 +1,6 @@
 pandas
 matplotlib
+openpyxl
 folium
 streamlit-folium
 geopandas
