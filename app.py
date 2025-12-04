@@ -15,7 +15,6 @@ def encontrar_linha_bairro(df):
             return i
     return None
 
-# Parser robusto para números BR
 def parse_num_br(valor):
     if pd.isna(valor):
         return pd.NA
@@ -49,11 +48,9 @@ def carregar_ano(caminho, ano):
     df = df_raw.iloc[idx_header + 1:].copy()
     df.columns = header
 
-    # Limpar colunas e padronizar nomes
     df = df.loc[:, ~df.columns.astype(str).str.upper().str.startswith("UNNAMED")]
     df.columns = df.columns.astype(str).str.strip().str.upper()
 
-    # Mapear cabeçalhos
     mapeamento = {
         "BAIRRO": "BAIRRO",
         "POPULAÇÃO": "POPULAÇÃO",
@@ -70,16 +67,13 @@ def carregar_ano(caminho, ano):
         st.warning(f"A coluna 'BAIRRO' não foi encontrada no arquivo {caminho}")
         return pd.DataFrame()
 
-    # Remover linhas inválidas e TOTAL
     df = df.dropna(subset=["BAIRRO"])
     df = df[df["BAIRRO"].astype(str).str.upper() != "TOTAL"]
 
-    # Converter colunas numéricas
     for c in df.columns:
         if c != "BAIRRO":
             df[c] = df[c].apply(parse_num_br)
 
-    # Arredondar incidências para 2 casas
     colunas_incidencia = ["INCIDÊNCIA TOTAL", "INCIDÊNCIA DE CASOS GRAVES", "TAXA DE LETALIDADE"]
     for c in colunas_incidencia:
         if c in df.columns:
@@ -112,7 +106,6 @@ mostrar_tabelas = st.checkbox("Mostrar tabelas", value=False)
 # Filtragem
 df_filtrado = df[(df["BAIRRO"].astype(str).isin(bairros_selecionados)) & (df["ANO"] == ano)]
 
-# Formatação BR para exibição (sem alterar dados originais)
 def formatar_br_valor(x):
     if pd.isna(x):
         return ""
@@ -154,9 +147,13 @@ def aplicar_formato_eixo_y(ax, indicador):
     if indicador in ["INCIDÊNCIA TOTAL", "INCIDÊNCIA DE CASOS GRAVES"]:
         ax.yaxis.set_major_formatter(mticker.FuncFormatter(yformatter_br))
     else:
-        # Remover qualquer formatter anterior (mostra sem decimais padrão do Matplotlib)
         ax.yaxis.set_major_formatter(mticker.ScalarFormatter())
         ax.yaxis.set_major_locator(mticker.MaxNLocator(integer=True))
+
+# Função para cores diferentes por bairro
+def gerar_cores(n):
+    cmap = plt.get_cmap("tab20")
+    return [cmap(i % 20) for i in range(n)]
 
 # Gráficos
 if not df.empty and indicador and len(bairros_selecionados) > 0:
@@ -164,11 +161,16 @@ if not df.empty and indicador and len(bairros_selecionados) > 0:
         fig, ax = plt.subplots(figsize=(14, 6))
         base = df[(df["ANO"] == ano) & (df["BAIRRO"].astype(str).isin(bairros_selecionados))].copy()
         dados_plot = base[["BAIRRO", indicador]].dropna().sort_values(indicador, ascending=False)
-        ax.bar(dados_plot["BAIRRO"], dados_plot[indicador], color="orange")
+
+        bairros = dados_plot["BAIRRO"].astype(str).tolist()
+        valores = dados_plot[indicador].tolist()
+        cores = gerar_cores(len(bairros))
+
+        ax.bar(bairros, valores, color=cores)
         ax.set_ylabel(indicador)
         ax.set_xlabel("Bairros")
         ax.set_title(f"{indicador} por Bairro - Fortaleza ({ano})")
-        ax.tick_params(axis="x", labelrotation=90)
+        ax.tick_params(axis="x", labelrotation=45)
         aplicar_formato_eixo_y(ax, indicador)
         st.pyplot(fig)
     else:
