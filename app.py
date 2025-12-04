@@ -182,8 +182,9 @@ if not df.empty and indicador and len(bairros_selecionados) > 0:
 
         for bairro in bairros_selecionados:
             dados_bairro = dados_plot[dados_plot["BAIRRO"].astype(str) == bairro].sort_values("ANO")
-            ax.plot(dados_bairro["ANO"].astype(int), dados_bairro[indicador], marker="o",
-                        ax.plot(dados_bairro["ANO"].astype(int), dados_bairro[indicador], marker="o", label=bairro)
+            ax.plot(dados_bairro["ANO"].astype(int), dados_bairro[indicador], marker="o", label=bairro)
+
+            ax.plot(dados_bairro["ANO"].astype(int), dados_bairro[indicador], marker="o", label=bairro)
 
             # calcular evolução percentual ano a ano
             valores = dados_bairro[indicador].values
