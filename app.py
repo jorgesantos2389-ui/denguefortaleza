@@ -177,25 +177,9 @@ if not df.empty and indicador and len(bairros_selecionados) > 0:
         base_evo = df[df["BAIRRO"].astype(str).isin(bairros_selecionados)].copy()
         fig, ax = plt.subplots(figsize=(12, 6))
         dados_plot = base_evo[["ANO", "BAIRRO", indicador]].dropna()
-
-        evolucao_textos = []
-
         for bairro in bairros_selecionados:
             dados_bairro = dados_plot[dados_plot["BAIRRO"].astype(str) == bairro].sort_values("ANO")
             ax.plot(dados_bairro["ANO"].astype(int), dados_bairro[indicador], marker="o", label=bairro)
-
-            ax.plot(dados_bairro["ANO"].astype(int), dados_bairro[indicador], marker="o", label=bairro)
-
-            # calcular evolução percentual ano a ano
-            valores = dados_bairro[indicador].values
-            anos = dados_bairro["ANO"].values
-            if len(valores) == 3:  # temos os três anos
-                perc_23 = ((valores[1] - valores[0]) / valores[0] * 100) if valores[0] != 0 else 0
-                perc_24 = ((valores[2] - valores[1]) / valores[1] * 100) if valores[1] != 0 else 0
-                evolucao_textos.append(
-                    f"{bairro}: 2022→2023 = {perc_23:.2f}% | 2023→2024 = {perc_24:.2f}%"
-                )
-
         ax.set_xticks([2022, 2023, 2024])
         ax.set_ylabel(indicador)
         ax.set_xlabel("Ano")
@@ -203,11 +187,5 @@ if not df.empty and indicador and len(bairros_selecionados) > 0:
         aplicar_formato_eixo_y(ax, indicador)
         ax.legend(loc="upper left", bbox_to_anchor=(1, 1))
         st.pyplot(fig)
-
-        # mostrar evolução percentual abaixo do gráfico
-        if evolucao_textos:
-            st.markdown("**Evolução percentual dos casos:**")
-            for texto in evolucao_textos:
-                st.write(texto)
 else:
     st.warning("Nenhum dado disponível para visualização. Selecione ao menos um bairro e um indicador.")
