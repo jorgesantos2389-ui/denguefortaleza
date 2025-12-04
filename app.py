@@ -177,9 +177,24 @@ if not df.empty and indicador and len(bairros_selecionados) > 0:
         base_evo = df[df["BAIRRO"].astype(str).isin(bairros_selecionados)].copy()
         fig, ax = plt.subplots(figsize=(12, 6))
         dados_plot = base_evo[["ANO", "BAIRRO", indicador]].dropna()
+
+        variacoes_totais = []
+
         for bairro in bairros_selecionados:
             dados_bairro = dados_plot[dados_plot["BAIRRO"].astype(str) == bairro].sort_values("ANO")
             ax.plot(dados_bairro["ANO"].astype(int), dados_bairro[indicador], marker="o", label=bairro)
+
+            # calcular variação total entre 2022 e 2024
+            valores = dados_bairro[indicador].values
+            if len(valores)
+            # calcular variação total entre 2022 e 2024
+            valores = dados_bairro[indicador].values
+            if len(valores) == 3:  # temos os três anos
+                perc_total = ((valores[2] - valores[0]) / valores[0] * 100) if valores[0] != 0 else 0
+                variacoes_totais.append(
+                    f"{bairro}: Variação total 2022→2024 = {perc_total:.2f}%"
+                )
+
         ax.set_xticks([2022, 2023, 2024])
         ax.set_ylabel(indicador)
         ax.set_xlabel("Ano")
@@ -187,5 +202,12 @@ if not df.empty and indicador and len(bairros_selecionados) > 0:
         aplicar_formato_eixo_y(ax, indicador)
         ax.legend(loc="upper left", bbox_to_anchor=(1, 1))
         st.pyplot(fig)
+
+        # mostrar variação percentual total abaixo do gráfico
+        if variacoes_totais:
+            st.markdown("**Variação total entre 2022 e 2024:**")
+            for texto in variacoes_totais:
+                st.write(texto)
 else:
     st.warning("Nenhum dado disponível para visualização. Selecione ao menos um bairro e um indicador.")
+
